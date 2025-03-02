@@ -1,7 +1,10 @@
-require('dotenv').config();
-const express = require('express');
-const axios = require('axios');
-const bodyParser = require('body-parser');
+require("dotenv").config();
+const express = require("express");
+const connectDB = require("./db");
+const Producto = require("./models/Producto");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const axios = require("axios");
 
 const app = express();
 app.use(express.json());
@@ -17,7 +20,59 @@ const manyChatRequest = axios.create({
     headers: { 'Authorization': `Bearer ${MANYCHAT_ACCESS_TOKEN}` }
 });
 
-// 📌 1. Webhook para recibir eventos de ManyChat
+// Conectar a MongoDB
+connectDB();
+
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+
+// 1. Endpoint para consultar un producto por ciudad
+app.post("/consulta-producto", async (req, res) => {
+  try {
+    const { subscriber_id, producto, ciudad } = req.body;
+
+    if (!subscriber_id || !producto || !ciudad) {
+      return res.status(400).json({ success: false, message: "Faltan datos" });
+    }
+
+    const resultado = await Producto.findOne({ producto, ciudad });
+
+    if (resultado) {
+      const mensaje = `📌 ${resultado.producto} está disponible en ${resultado.farmacia} (📍 ${resultado.ciudad}) `;
+
+      // Enviar la respuesta a ManyChat
+      await axios.post("https://api.manychat.com/v2/sending/sendContent", {
+        subscriber_id,
+        producto, 
+        ciudad, 
+        message: { text: mensaje },
+      }, {
+        headers: { Authorization: `Bearer ${process.env.MANYCHAT_TOKEN}` }
+      });
+
+      return res.json({ success: true, producto: producto, ciudad: ciudad, message: mensaje });
+    } else {
+      return res.json({ success: false, message: "No contamos con el producto en esa ciudad." });
+    }
+  } catch (error) {
+    console.error("Error en /consulta-producto:", error.code);
+    res.status(500).json({ success: false, message: "Error en el servidor" });
+  }
+});
+
+// 2. Endpoint para listar todos los productos
+app.get("/productos", async (req, res) => {
+  try {
+    const productos = await Producto.find();
+    res.json(productos);
+  } catch (error) {
+    console.error("Error en /productos:", error);
+    res.status(500).json({ success: false, message: "Error en el servidor" });
+  }
+});
+
+// 3. Webhook para recibir eventos de ManyChat
 app.post('/webhook', (req, res) => {
     console.log("Evento recibido desde ManyChat:", req.body);
     
@@ -31,7 +86,7 @@ app.post('/webhook', (req, res) => {
     res.status(200).send("OK");
 });
 
-// 📌 2. Obtener información de un suscriptor
+// 4. Obtener información de un suscriptor
 app.get('/subscriber/:id', async (req, res) => {
     try {
         const response = await manyChatRequest.get(`subscriber/getInfo?subscriber_id=${req.params.id}`);
@@ -41,7 +96,7 @@ app.get('/subscriber/:id', async (req, res) => {
     }
 });
 
-// 📌 3. Enviar un mensaje a un suscriptor
+// 5. Enviar un mensaje a un suscriptor
 app.post('/send-message', async (req, res) => {
     try {
         const { subscriber_id, message } = req.body;
@@ -55,7 +110,7 @@ app.post('/send-message', async (req, res) => {
     }
 });
 
-// 📌 4. Responder automáticamente a eventos de ManyChat
+// 6. Responder automáticamente a eventos de ManyChat
 app.post('/auto-response', async (req, res) => {
     try {
         const { subscriber_id, message } = req.body;
@@ -72,10 +127,9 @@ app.post('/auto-response', async (req, res) => {
     }
 });
 
-
 app.get('/', (req, res) => {
-    res.send('Bienvenido');
-  });
+  res.send('Bienvenido');
+});
 
 // Iniciar servidor
 const PORT = process.env.PORT || 3000;
