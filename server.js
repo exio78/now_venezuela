@@ -37,7 +37,7 @@ app.post("/consulta-producto", async (req, res) => {
     }
 
     // Buscar todas las farmacias que tienen el producto en la ciudad
-    const farmacias = await Producto.find({ producto, ciudad });
+    const farmacias = await Producto.find({ producto, ciudad }).limit(4);
 
     if (farmacias.length > 0) {
       const listaFarmacias = farmacias.map(f => ({ nombre: f.farmacia }));
