@@ -39,14 +39,13 @@ app.post("/consulta-producto", async (req, res) => {
     const resultado = await Producto.findOne({ producto, ciudad });
 
     if (resultado) {
-      const mensaje = `📌 ${resultado.producto} está disponible en ${resultado.farmacia} (📍 ${resultado.ciudad}) `;
 
       // Enviar la respuesta a ManyChat
       await axios.post("https://api.manychat.com/v2/sending/sendContent", {
         subscriber_id,
         producto, 
         ciudad, 
-        message: { text: mensaje },
+        farmacia,
       }, {
         headers: { Authorization: `Bearer ${process.env.MANYCHAT_TOKEN}` }
       });
