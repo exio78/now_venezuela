@@ -36,26 +36,30 @@ app.post("/consulta-producto", async (req, res) => {
       return res.status(400).json({ success: false, message: "Faltan datos" });
     }
 
-    // Buscar todas las farmacias que tienen el producto en la ciudad
-    const farmacias = await Producto.find({ producto, ciudad }).limit(4);
+    const resultado = await Producto.find({
+      producto: { $regex: new RegExp(producto, "i") },
+      ciudad: { $regex: new RegExp(ciudad, "i") }
+    }).limit(4);
+    
+    if (resultado) {
+      const farmacias = resultado.map(r => r.farmacia).join(',\n');
+      const mensaje = `En ${resultado[0].ciudad} el producto ${resultado[0].producto} está disponible en las farmacias:\n ${farmacias}.`;
+      console.log(mensaje);
 
-    if (farmacias.length > 0) {
-      const listaFarmacias = farmacias.map(f => ({ nombre: f.farmacia }));
-
-      return res.json({
-        success: true,
-        message: "Farmacias disponibles en la ciudad.",
-        farmacias: listaFarmacias
+      // Enviar la respuesta a ManyChat
+      await axios.post("https://api.manychat.com/v2/sending/sendContent", {
+        subscriber_id,
+        message: { text: mensaje },
+      }, {
+        headers: { Authorization: `Bearer ${process.env.MANYCHAT_TOKEN}` }
       });
+
+      return res.json({ success: true, message: mensaje });
     } else {
-      return res.json({
-        success: false,
-        message: "No contamos con el producto en esa ciudad.",
-        farmacias: []
-      });
+      return res.json({ success: false, message: "No encontramos el producto en esa ciudad." });
     }
   } catch (error) {
-    console.error("Error en /consulta-producto:", error);
+    console.error("Error en /consulta-producto:", error.code);
     res.status(500).json({ success: false, message: "Error en el servidor" });
   }
 });
