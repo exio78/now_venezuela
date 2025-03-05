@@ -38,7 +38,7 @@ app.post("/consulta-producto", async (req, res) => {
       return res.status(400).json({ success: false, message: "Faltan datos" });
     }
 
-    const resultado = await Producto.findOne({ producto, ciudad });
+    const resultados = await Producto.find({ producto, ciudad }).limit(4);
 
     if (resultado) {
       const mensaje = `📌 ${resultado.producto} está disponible en ${resultado.farmacia} (📍 ${resultado.ciudad}).`;
