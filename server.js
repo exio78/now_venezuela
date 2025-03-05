@@ -38,14 +38,11 @@ app.post("/consulta-producto", async (req, res) => {
       return res.status(400).json({ success: false, message: "Faltan datos en la solicitud" });
     }
 
-    // Buscar hasta 4 farmacias que tengan el producto en la ciudad
-    const resultados = await Producto.find({ producto, ciudad }).limit(4);
+    // Buscar solo una farmacia que tenga el producto en la ciudad
+    const resultado = await Producto.findOne({ producto, ciudad });
 
-    if (resultados.length > 0) {
-      // Construir la lista de farmacias
-      const farmacias = resultados.map((r) => ({ nombre: r.farmacia }));
-
-      const mensaje = `📌 Hemos encontrado ${farmacias.length} farmacias con ${producto} en ${ciudad}.`;
+    if (resultado) {
+      const mensaje = `📌 Hemos encontrado ${producto} en ${resultado.farmacia} en la ciudad de ${ciudad}.`;
 
       // Enviar la respuesta a ManyChat
       await axios.post(
@@ -59,7 +56,7 @@ app.post("/consulta-producto", async (req, res) => {
         }
       );
 
-      return res.json({ success: true, message: mensaje, farmacias });
+      return res.json({ success: true, message: mensaje, farmacia: resultado.farmacia });
     } else {
       return res.json({ success: false, message: `No encontramos ${producto} en ${ciudad}.` });
     }
