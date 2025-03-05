@@ -30,42 +30,35 @@ app.use(bodyParser.json());
 // 1. Endpoint para consultar un producto por ciudad
 app.post("/consulta-producto", async (req, res) => {
   try {
-    console.log("Datos recibidos:", req.body); // Verifica qué datos llegan realmente
-
     const { subscriber_id, producto, ciudad } = req.body;
 
     if (!subscriber_id || !producto || !ciudad) {
-      return res.status(400).json({ success: false, message: "Faltan datos en la solicitud" });
+      return res.status(400).json({ success: false, message: "Faltan datos" });
     }
 
-    // Buscar solo una farmacia que tenga el producto en la ciudad
-    const resultado = await Producto.findOne({ producto, ciudad });
+    // Buscar todas las farmacias que tienen el producto en la ciudad
+    const farmacias = await Producto.find({ producto, ciudad }).limit(4);
 
-    if (resultado) {
-      const mensaje = `📌 Hemos encontrado ${producto} en ${resultado.farmacia} en la ciudad de ${ciudad}.`;
+    if (farmacias.length > 0) {
+      const listaFarmacias = farmacias.map(f => ({ nombre: f.farmacia }));
 
-      // Enviar la respuesta a ManyChat
-      await axios.post(
-        "https://api.manychat.com/v2/sending/sendContent",
-        {
-          subscriber_id,
-          message: { text: mensaje },
-        },
-        {
-          headers: { Authorization: `Bearer ${process.env.MANYCHAT_TOKEN}` },
-        }
-      );
-
-      return res.json({ success: true, message: mensaje, farmacia: resultado.farmacia });
+      return res.json({
+        success: true,
+        message: "Farmacias disponibles en la ciudad.",
+        farmacias: listaFarmacias
+      });
     } else {
-      return res.json({ success: false, message: `No encontramos ${producto} en ${ciudad}.` });
+      return res.json({
+        success: false,
+        message: "No contamos con el producto en esa ciudad.",
+        farmacias: []
+      });
     }
   } catch (error) {
     console.error("Error en /consulta-producto:", error);
     res.status(500).json({ success: false, message: "Error en el servidor" });
   }
 });
-
 
 // 2. Endpoint para listar todos los productos
 app.get("/productos", async (req, res) => {
