@@ -36,15 +36,10 @@ app.post("/consulta-producto", async (req, res) => {
       return res.status(400).json({ success: false, message: "Faltan datos" });
     }
 
-    const resultado = await Producto.find({
-      producto: { $regex: new RegExp(producto, "i") },
-      ciudad: { $regex: new RegExp(ciudad, "i") }
-    }).limit(4);
-    
+    const resultado = await Producto.findOne({ producto, ciudad });
+
     if (resultado) {
-      const farmacias = resultado.map(r => r.farmacia).join(',\n');
-      const mensaje = `En ${resultado[0].ciudad} el producto ${resultado[0].producto} está disponible en las farmacias:\n ${farmacias}.`;
-      console.log(mensaje);
+      const mensaje = `📌 ${resultado.producto} está disponible en ${resultado.farmacia} (📍 ${resultado.ciudad}) por $${resultado.precio}.`;
 
       // Enviar la respuesta a ManyChat
       await axios.post("https://api.manychat.com/v2/sending/sendContent", {
