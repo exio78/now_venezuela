@@ -11,7 +11,7 @@ app.use(express.json());
 app.use(bodyParser.json()); // Manejo de JSON en solicitudes
 
 // Configuración de ManyChat
-const MANYCHAT_API_URL = "https://api.manychat.com/fb/";
+const MANYCHAT_API_URL = "https://api.manychat.com/v2/";
 const MANYCHAT_ACCESS_TOKEN = process.env.MANYCHAT_ACCESS_TOKEN;
 
 // Configurar instancia de Axios para ManyChat
@@ -27,7 +27,7 @@ connectDB();
 app.use(cors());
 app.use(bodyParser.json());
 
-// 1. Endpoint para consultar un producto por ciudad
+// 1. Endpoint para consultar un producto por ciudad (búsqueda parcial e insensible a mayúsculas)
 app.post("/consulta-producto", async (req, res) => {
   try {
     const { subscriber_id, producto, ciudad } = req.body;
@@ -36,29 +36,44 @@ app.post("/consulta-producto", async (req, res) => {
       return res.status(400).json({ success: false, message: "Faltan datos" });
     }
 
-    // Buscar todas las farmacias que tienen el producto en la ciudad
-    const farmacias = await Producto.find({ producto, ciudad }).limit(4);
+    // Convertir a expresiones regulares (búsqueda parcial, sin importar mayúsculas)
+    const regexProducto = new RegExp(producto.trim(), "i");
+    const regexCiudad = new RegExp(ciudad.trim(), "i");
+
+    console.log(`🔍 Buscando: Producto -> ${regexProducto} | Ciudad -> ${regexCiudad}`);
+
+    // Buscar farmacias con coincidencias parciales
+    const farmacias = await Producto.find({ 
+      producto: regexProducto, 
+      ciudad: regexCiudad 
+    }).limit(4);
+
+    console.log("📌 Resultados encontrados:", farmacias);
 
     if (farmacias.length > 0) {
+
       const listaFarmacias = farmacias.map(f => ({ nombre: f.farmacia }));
+      const lista_farmacias_corrida = farmacias.map(r => r.farmacia).join(',\n');
+      const mensaje = `En ${farmacias[0].ciudad} el producto ${farmacias[0].producto} está disponible en las farmacias:\n ${lista_farmacias_corrida}.`;
 
       return res.json({
         success: true,
-        message: "Farmacias disponibles en la ciudad.",
+        message: mensaje,
         farmacias: listaFarmacias
       });
     } else {
       return res.json({
         success: false,
-        message: "No contamos con el producto en esa ciudad.",
+        message: `⚠ No encontramos "${producto}" en "${ciudad}".`,
         farmacias: []
       });
     }
   } catch (error) {
-    console.error("Error en /consulta-producto:", error);
+    console.error("❌ Error en /consulta-producto:", error);
     res.status(500).json({ success: false, message: "Error en el servidor" });
   }
 });
+
 
 // 2. Endpoint para listar todos los productos
 app.get("/productos", async (req, res) => {
